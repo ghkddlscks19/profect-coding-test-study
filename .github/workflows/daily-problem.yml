@@ -1,0 +1,310 @@
+# .github/workflows/daily-problem.yml
+name: Daily Programmers Problem to Discord
+
+on:
+  schedule:
+    # 매일 오전 9시 (UTC 기준 0시 = 한국시간 9시)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 수동 실행도 가능
+
+jobs:
+  send-daily-problem:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Calculate today's problem index
+      id: calculate
+      run: |
+        # 스터디 시작 날짜 설정 (원하는 날짜로 변경하세요)
+        START_DATE="2025-09-23"
+        TODAY=$(date +%Y-%m-%d)
+        
+        # 날짜 차이 계산 (며칠째인지)
+        DAYS_DIFF=$(( ( $(date -d "$TODAY" +%s) - $(date -d "$START_DATE" +%s) ) / 86400 ))
+        DAY_NUMBER=$(( $DAYS_DIFF + 1 ))
+        
+        echo "Current day number: $DAY_NUMBER"
+        
+        # 79일을 초과했는지 확인
+        if [ $DAY_NUMBER -gt 79 ]; then
+          echo "🎉 79개 문제를 모두 완료했습니다!"
+          echo "completed=true" >> $GITHUB_OUTPUT
+          echo "day_number=$DAY_NUMBER" >> $GITHUB_OUTPUT
+          echo "current_date=$TODAY" >> $GITHUB_OUTPUT
+        elif [ $DAY_NUMBER -lt 1 ]; then
+          echo "❌ 아직 시작 날짜가 되지 않았습니다."
+          echo "not_started=true" >> $GITHUB_OUTPUT
+          echo "day_number=$DAY_NUMBER" >> $GITHUB_OUTPUT
+          echo "current_date=$TODAY" >> $GITHUB_OUTPUT
+        else
+          # 정상 범위 (1-79일)
+          PROBLEM_INDEX=$(( $DAY_NUMBER - 1 ))  # 0부터 시작하므로 -1
+          echo "problem_index=$PROBLEM_INDEX" >> $GITHUB_OUTPUT
+          echo "day_number=$DAY_NUMBER" >> $GITHUB_OUTPUT
+          echo "current_date=$TODAY" >> $GITHUB_OUTPUT
+          echo "completed=false" >> $GITHUB_OUTPUT
+          echo "not_started=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Get problem details
+      if: steps.calculate.outputs.completed == 'false' && steps.calculate.outputs.not_started == 'false'
+      id: problem
+      run: |
+        # 79개 문제 배열 (실제 문제 데이터)
+        declare -a problems=(
+          "교점에 별 만들기|https://programmers.co.kr/learn/courses/30/lessons/87377|Level 2|3장. 배열"
+          "삼각 달팽이|https://programmers.co.kr/learn/courses/30/lessons/68645|Level 2|3장. 배열"
+          "거리두기 확인하기|https://programmers.co.kr/learn/courses/30/lessons/81302|Level 2|3장. 배열"
+          "행렬의 곱셈|https://programmers.co.kr/learn/courses/30/lessons/12949|Level 2|3장. 배열"
+          "자연수 뒤집어 배열로 만들기|https://programmers.co.kr/learn/courses/30/lessons/12932|Level 1|4장. 문자열"
+          "시저 암호|https://programmers.co.kr/learn/courses/30/lessons/12926|Level 1|4장. 문자열"
+          "이상한 문자 만들기|https://programmers.co.kr/learn/courses/30/lessons/12930|Level 1|4장. 문자열"
+          "문자열 압축|https://programmers.co.kr/learn/courses/30/lessons/60057|Level 2|4장. 문자열"
+          "3진법 뒤집기|https://programmers.co.kr/learn/courses/30/lessons/68935|Level 1|4장. 문자열"
+          "이진 변환 반복하기|https://programmers.co.kr/learn/courses/30/lessons/70129|Level 2|4장. 문자열"
+          "문자열 내 p와 y의 개수|https://programmers.co.kr/learn/courses/30/lessons/12916|Level 1|4장. 문자열"
+          "숫자 문자열과 영단어|https://programmers.co.kr/learn/courses/30/lessons/81301|Level 1|4장. 문자열"
+          "문자열 다루기 기본|https://programmers.co.kr/learn/courses/30/lessons/12918|Level 1|4장. 문자열"
+          "신규 아이디 추천|https://programmers.co.kr/learn/courses/30/lessons/72410|Level 1|4장. 문자열"
+          "쿼드압축 후 개수 세기|https://school.programmers.co.kr/learn/courses/30/lessons/68936|Level 2|5장. 재귀"
+          "하노이의 탑|https://school.programmers.co.kr/learn/courses/30/lessons/12946|Level 3|5장. 재귀"
+          "모음 사전|https://school.programmers.co.kr/learn/courses/30/lessons/84512|Level 2|5장. 재귀"
+          "모의고사|https://school.programmers.co.kr/learn/courses/30/lessons/42840|Level 1|6장. 완전 탐색"
+          "카펫|https://school.programmers.co.kr/learn/courses/30/lessons/42842|Level 2|6장. 완전 탐색"
+          "수식 최대화|https://school.programmers.co.kr/learn/courses/30/lessons/67257|Level 2|6장. 완전 탐색"
+          "소수 찾기|https://school.programmers.co.kr/learn/courses/30/lessons/42839|Level 2|6장. 완전 탐색"
+          "불량 사용자|https://school.programmers.co.kr/learn/courses/30/lessons/64064|Level 3|6장. 완전 탐색"
+          "K번째 수|https://school.programmers.co.kr/learn/courses/30/lessons/42748|Level 1|7장. 정렬"
+          "두 개 뽑아서 더하기|https://school.programmers.co.kr/learn/courses/30/lessons/68644|Level 1|7장. 정렬"
+          "H-index|https://school.programmers.co.kr/learn/courses/30/lessons/42747|Level 2|7장. 정렬"
+          "문자열 내림차순으로 배치하기|https://school.programmers.co.kr/learn/courses/30/lessons/12917|Level 1|7장. 정렬"
+          "문자열 내 마음대로 정렬하기|https://school.programmers.co.kr/learn/courses/30/lessons/12915|Level 1|7장. 정렬"
+          "가장 큰 수|https://school.programmers.co.kr/learn/courses/30/lessons/42746|Level 2|7장. 정렬"
+          "메뉴 리뉴얼|https://school.programmers.co.kr/learn/courses/30/lessons/72411|Level 2|7장. 정렬"
+          "순위 검색|https://school.programmers.co.kr/learn/courses/30/lessons/72412|Level 2|8장. 이진 탐색"
+          "입국심사|https://school.programmers.co.kr/learn/courses/30/lessons/43238|Level 3|8장. 이진 탐색"
+          "징검다리|https://school.programmers.co.kr/learn/courses/30/lessons/43236|Level 4|8장. 이진 탐색"
+          "전화번호 목록|https://school.programmers.co.kr/learn/courses/30/lessons/42577|Level 2|9장. 해시"
+          "중복된 문자 제거|https://school.programmers.co.kr/learn/courses/30/lessons/120888|Level 0|9장. 해시"
+          "A로 B 만들기|https://school.programmers.co.kr/learn/courses/30/lessons/120886|Level 0|9장. 해시"
+          "없는 숫자 더하기|https://school.programmers.co.kr/learn/courses/30/lessons/86051|Level 1|9장. 해시"
+          "완주하지 못한 선수|https://programmers.co.kr/learn/courses/30/lessons/42576|Level 1|9장. 해시"
+          "피보나치 수|https://school.programmers.co.kr/learn/courses/30/lessons/12945|Level 2|10장. 동적 프로그래밍"
+          "정수 삼각형|https://school.programmers.co.kr/learn/courses/30/lessons/43105|Level 3|10장. 동적 프로그래밍"
+          "등굣길|https://school.programmers.co.kr/learn/courses/30/lessons/42898|Level 3|10장. 동적 프로그래밍"
+          "사칙연산|https://school.programmers.co.kr/learn/courses/30/lessons/1843|Level 4|10장. 동적 프로그래밍"
+          "올바른 괄호|https://school.programmers.co.kr/learn/courses/30/lessons/12909|Level 2|11장. 자주 등장하는 자료 구조"
+          "괄호 회전하기|https://school.programmers.co.kr/learn/courses/30/lessons/76502|Level 2|11장. 자주 등장하는 자료 구조"
+          "주식 가격|https://school.programmers.co.kr/learn/courses/30/lessons/42584|Level 2|11장. 자주 등장하는 자료 구조"
+          "기능 개발|https://school.programmers.co.kr/learn/courses/30/lessons/42586|Level 2|11장. 자주 등장하는 자료 구조"
+          "다리를 지나는 트럭|https://school.programmers.co.kr/learn/courses/30/lessons/42583|Level 2|11장. 자주 등장하는 자료 구조"
+          "순위|https://school.programmers.co.kr/learn/courses/30/lessons/49191|Level 3|11장. 자주 등장하는 자료 구조"
+          "방의 개수|https://programmers.co.kr/learn/courses/30/lessons/49190|Level 5|11장. 자주 등장하는 자료 구조"
+          "길 찾기 게임|https://school.programmers.co.kr/learn/courses/30/lessons/42892|Level 3|11장. 자주 등장하는 자료 구조"
+          "이중 우선순위 큐|https://programmers.co.kr/learn/courses/30/lessons/42628|Level 3|11장. 자주 등장하는 자료 구조"
+          "디스크 컨트롤러|https://school.programmers.co.kr/learn/courses/30/lessons/42627|Level 3|11장. 자주 등장하는 자료 구조"
+          "보석 쇼핑|https://school.programmers.co.kr/learn/courses/30/lessons/67258|Level 3|11장. 자주 등장하는 자료 구조"
+          "섬 연결하기|https://school.programmers.co.kr/learn/courses/30/lessons/42861|Level 3|11장. 자주 등장하는 자료 구조"
+          "호텔 방 배정|https://programmers.co.kr/learn/courses/30/lessons/64063|Level 4|11장. 자주 등장하는 자료 구조"
+          "가사 검색|https://school.programmers.co.kr/learn/courses/30/lessons/60060|Level 4|11장. 자주 등장하는 자료 구조"
+          "스킬트리|https://school.programmers.co.kr/learn/courses/30/lessons/49993|Level 2|12장. 구현"
+          "키패드 누르기|https://school.programmers.co.kr/learn/courses/30/lessons/67256|Level 1|12장. 구현"
+          "타겟 넘버|https://school.programmers.co.kr/learn/courses/30/lessons/43165|Level 2|12장. 구현"
+          "네트워크|https://school.programmers.co.kr/learn/courses/30/lessons/43162|Level 3|12장. 구현"
+          "단어 변환|https://school.programmers.co.kr/learn/courses/30/lessons/43163|Level 3|12장. 구현"
+          "게임 맵 최단거리|https://school.programmers.co.kr/learn/courses/30/lessons/1844|Level 3|12장. 구현"
+          "체육복|https://programmers.co.kr/learn/courses/30/lessons/42862|Level 1|12장. 구현"
+          "큰 수 만들기|https://school.programmers.co.kr/learn/courses/30/lessons/42883|Level 2|12장. 구현"
+          "단속카메라|https://school.programmers.co.kr/learn/courses/30/lessons/42884|Level 3|12장. 구현"
+          "신고 결과 받기|https://school.programmers.co.kr/learn/courses/30/lessons/92334|Level 1|13장. 도전: 카카오 2022 블라인드 테스트"
+          "k진수에서 소수 개수 구하기|https://school.programmers.co.kr/learn/courses/30/lessons/92335|Level 2|13장. 도전: 카카오 2022 블라인드 테스트"
+          "주차 요금 계산|https://school.programmers.co.kr/learn/courses/30/lessons/92341|Level 2|13장. 도전: 카카오 2022 블라인드 테스트"
+          "양궁대회|https://school.programmers.co.kr/learn/courses/30/lessons/92342|Level 2|13장. 도전: 카카오 2022 블라인드 테스트"
+          "양과 늑대|https://school.programmers.co.kr/learn/courses/30/lessons/92343|Level 3|13장. 도전: 카카오 2022 블라인드 테스트"
+          "파괴되지 않은 건물|https://school.programmers.co.kr/learn/courses/30/lessons/92344|Level 3|13장. 도전: 카카오 2022 블라인드 테스트"
+          "사라지는 발판|https://school.programmers.co.kr/learn/courses/30/lessons/92345|Level 3|13장. 도전: 카카오 2022 블라인드 테스트"
+          "외톨이 알파벳|https://school.programmers.co.kr/learn/courses/15008/lessons/121683|Level 1|14장. 코딩 전문 역량 인증 시험, PCCP 모의고사"
+          "체육대회|https://school.programmers.co.kr/learn/courses/15008/lessons/121684|Level 2|14장. 코딩 전문 역량 인증 시험, PCCP 모의고사"
+          "유전법칙|https://school.programmers.co.kr/learn/courses/15008/lessons/121685|Level 2|14장. 코딩 전문 역량 인증 시험, PCCP 모의고사"
+          "운영체제|https://school.programmers.co.kr/learn/courses/15008/lessons/121686|Level 3|14장. 코딩 전문 역량 인증 시험, PCCP 모의고사"
+          "실습용 로봇|https://school.programmers.co.kr/learn/courses/15009/lessons/121687|Level 1|14장. 코딩 전문 역량 인증 시험, PCCP 모의고사"
+          "신입사원 교육|https://school.programmers.co.kr/learn/courses/15009/lessons/121688|Level 2|14장. 코딩 전문 역량 인증 시험, PCCP 모의고사"
+          "카페 확장|https://school.programmers.co.kr/learn/courses/15009/lessons/121689|Level 2|14장. 코딩 전문 역량 인증 시험, PCCP 모의고사"
+          "보물 지도|https://school.programmers.co.kr/learn/courses/15009/lessons/121690|Level 3|14장. 코딩 전문 역량 인증 시험, PCCP 모의고사"
+        )
+        
+        # 오늘의 문제 정보 추출
+        PROBLEM_DATA="${problems[${{ steps.calculate.outputs.problem_index }}]}"
+        IFS='|' read -r NAME URL LEVEL CHAPTER <<< "$PROBLEM_DATA"
+        
+        echo "name=$NAME" >> $GITHUB_OUTPUT
+        echo "url=$URL" >> $GITHUB_OUTPUT
+        echo "level=$LEVEL" >> $GITHUB_OUTPUT
+        echo "chapter=$CHAPTER" >> $GITHUB_OUTPUT
+        
+    - name: Send daily problem to Discord
+      if: steps.calculate.outputs.completed == 'false' && steps.calculate.outputs.not_started == 'false'
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: |
+        # Discord 메시지 생성
+        DISCORD_MESSAGE=$(cat << EOF
+        {
+          "embeds": [{
+            "title": "📚 오늘의 프로그래머스 문제",
+            "description": "**Day ${{ steps.calculate.outputs.day_number }}/79** - ${{ steps.problem.outputs.name }}",
+            "color": 3447003,
+            "fields": [
+              {
+                "name": "📊 난이도",
+                "value": "${{ steps.problem.outputs.level }}",
+                "inline": true
+              },
+              {
+                "name": "📖 챕터",
+                "value": "${{ steps.problem.outputs.chapter }}",
+                "inline": true
+              },
+              {
+                "name": "📅 날짜",
+                "value": "${{ steps.calculate.outputs.current_date }}",
+                "inline": true
+              },
+              {
+                "name": "🔗 문제 링크",
+                "value": "[${{ steps.problem.outputs.name }}](${{ steps.problem.outputs.url }})",
+                "inline": false
+              },
+              {
+                "name": "📈 진행률",
+                "value": "${{ steps.calculate.outputs.day_number }}/79 ($(( ${{ steps.calculate.outputs.day_number }} * 100 / 79 ))%)",
+                "inline": false
+              }
+            ],
+            "footer": {
+              "text": "💪 오늘도 화이팅! 🚀"
+            },
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+          }]
+        }
+        EOF
+        )
+        
+        # Discord로 메시지 전송
+        curl -X POST "$DISCORD_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "$DISCORD_MESSAGE"
+          
+    - name: Send completion message
+      if: steps.calculate.outputs.completed == 'true'
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: |
+        COMPLETION_MESSAGE=$(cat << EOF
+        {
+          "embeds": [{
+            "title": "🎉 프로그래머스 79문제 완주!",
+            "description": "**축하합니다!** 모든 문제를 완료했습니다! 🏆",
+            "color": 65280,
+            "fields": [
+              {
+                "name": "📊 총 완료 문제",
+                "value": "79개",
+                "inline": true
+              },
+              {
+                "name": "📅 완료일",
+                "value": "${{ steps.calculate.outputs.current_date }}",
+                "inline": true
+              },
+              {
+                "name": "⏱️ 총 소요 기간",
+                "value": "79일",
+                "inline": true
+              },
+              {
+                "name": "🎯 달성률",
+                "value": "100% 완주! 🎊",
+                "inline": false
+              }
+            ],
+            "footer": {
+              "text": "정말 수고하셨습니다! 이제 GitHub Actions가 자동으로 중지됩니다. 🛑"
+            },
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+          }]
+        }
+        EOF
+        )
+        
+        curl -X POST "$DISCORD_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "$COMPLETION_MESSAGE"
+          
+    - name: Disable workflow after completion
+      if: steps.calculate.outputs.completed == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # 워크플로우 비활성화
+        curl -X PUT \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${{ github.repository }}/actions/workflows/daily-problem.yml/disable"
+        
+        echo "🛑 워크플로우가 자동으로 비활성화되었습니다."
+        
+    - name: Send not started message
+      if: steps.calculate.outputs.not_started == 'true'
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: |
+        NOT_STARTED_MESSAGE=$(cat << EOF
+        {
+          "embeds": [{
+            "title": "⏰ 아직 시작 전입니다",
+            "description": "프로그래머스 79문제 챌린지가 아직 시작되지 않았습니다.",
+            "color": 16776960,
+            "fields": [
+              {
+                "name": "📅 시작 예정일",
+                "value": "2025-09-23",
+                "inline": true
+              },
+              {
+                "name": "📅 오늘 날짜",
+                "value": "${{ steps.calculate.outputs.current_date }}",
+                "inline": true
+              }
+            ],
+            "footer": {
+              "text": "시작일까지 조금만 기다려주세요! ⏳"
+            },
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+          }]
+        }
+        EOF
+        )
+        
+        curl -X POST "$DISCORD_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "$NOT_STARTED_MESSAGE"
+          
+    - name: Log success
+      run: |
+        if [ "${{ steps.calculate.outputs.completed }}" == "true" ]; then
+          echo "🎉 79일 완료! 완료 메시지를 전송했습니다."
+          echo "🛑 워크플로우가 자동으로 비활성화되었습니다."
+        elif [ "${{ steps.calculate.outputs.not_started }}" == "true" ]; then
+          echo "⏰ 아직 시작 전입니다."
+        else
+          echo "✅ 성공적으로 전송되었습니다!"
+          echo "📅 날짜: ${{ steps.calculate.outputs.current_date }}"
+          echo "📚 문제: ${{ steps.problem.outputs.name }}"
+          echo "🔢 Day: ${{ steps.calculate.outputs.day_number }}/79"
+          PROGRESS=$(( ${{ steps.calculate.outputs.day_number }} * 100 / 79 ))
+          echo "📈 진행률: ${PROGRESS}%"
+        fi
