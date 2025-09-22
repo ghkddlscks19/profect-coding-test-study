@@ -1,0 +1,279 @@
+# .github/workflows/check-submissions.yml
+name: Check Daily Submissions
+
+on:
+  schedule:
+    # 매일 오후 11시 30분 (UTC 기준 14:30 = 한국시간 23:30)
+    - cron: '30 14 * * *'
+  workflow_dispatch: # 수동 실행도 가능
+
+jobs:
+  check-submissions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Calculate today's problem
+      id: calculate
+      run: |
+        # 시작 날짜 (daily-problem.yml과 동일하게 설정)
+        START_DATE="2025-09-23"
+        TODAY=$(date +%Y-%m-%d)
+        
+        DAYS_DIFF=$(( ( $(date -d "$TODAY" +%s) - $(date -d "$START_DATE" +%s) ) / 86400 ))
+        DAY_NUMBER=$(( $DAYS_DIFF + 1 ))
+        
+        echo "day_number=$DAY_NUMBER" >> $GITHUB_OUTPUT
+        echo "current_date=$TODAY" >> $GITHUB_OUTPUT
+        
+        # 스터디 기간 내인지 확인
+        if [ $DAY_NUMBER -gt 79 ] || [ $DAY_NUMBER -lt 1 ]; then
+          echo "out_of_range=true" >> $GITHUB_OUTPUT
+        else
+          echo "out_of_range=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Get today's problem info
+      if: steps.calculate.outputs.out_of_range == 'false'
+      id: problem
+      run: |
+        DAY_NUMBER=${{ steps.calculate.outputs.day_number }}
+        PROBLEM_INDEX=$(( $DAY_NUMBER - 1 ))
+        
+        # 문제 이름 배열 (daily-problem.yml과 동일)
+        declare -a problem_names=(
+          "교점에별만들기"
+          "삼각달팽이"
+          "거리두기확인하기"
+          "행렬의곱셈"
+          "자연수뒤집어배열로만들기"
+          "시저암호"
+          "이상한문자만들기"
+          "문자열압축"
+          "3진법뒤집기"
+          "이진변환반복하기"
+          "문자열내p와y의개수"
+          "숫자문자열과영단어"
+          "문자열다루기기본"
+          "신규아이디추천"
+          "쿼드압축후개수세기"
+          "하노이의탑"
+          "모음사전"
+          "모의고사"
+          "카펫"
+          "수식최대화"
+          "소수찾기"
+          "불량사용자"
+          "K번째수"
+          "두개뽑아서더하기"
+          "H-index"
+          "문자열내림차순으로배치하기"
+          "문자열내마음대로정렬하기"
+          "가장큰수"
+          "메뉴리뉴얼"
+          "순위검색"
+          "입국심사"
+          "징검다리"
+          "전화번호목록"
+          "중복된문자제거"
+          "A로B만들기"
+          "없는숫자더하기"
+          "완주하지못한선수"
+          "피보나치수"
+          "정수삼각형"
+          "등굣길"
+          "사칙연산"
+          "올바른괄호"
+          "괄호회전하기"
+          "주식가격"
+          "기능개발"
+          "다리를지나는트럭"
+          "순위"
+          "방의개수"
+          "길찾기게임"
+          "이중우선순위큐"
+          "디스크컨트롤러"
+          "보석쇼핑"
+          "섬연결하기"
+          "호텔방배정"
+          "가사검색"
+          "스킬트리"
+          "키패드누르기"
+          "타겟넘버"
+          "네트워크"
+          "단어변환"
+          "게임맵최단거리"
+          "체육복"
+          "큰수만들기"
+          "단속카메라"
+          "신고결과받기"
+          "k진수에서소수개수구하기"
+          "주차요금계산"
+          "양궁대회"
+          "양과늑대"
+          "파괴되지않은건물"
+          "사라지는발판"
+          "외톨이알파벳"
+          "체육대회"
+          "유전법칙"
+          "운영체제"
+          "실습용로봇"
+          "신입사원교육"
+          "카페확장"
+          "보물지도"
+        )
+        
+        PROBLEM_NAME="${problem_names[$PROBLEM_INDEX]}"
+        FOLDER_PATH="problems/day$(printf "%02d" $DAY_NUMBER)-${PROBLEM_NAME}"
+        
+        echo "problem_name=$PROBLEM_NAME" >> $GITHUB_OUTPUT
+        echo "folder_path=$FOLDER_PATH" >> $GITHUB_OUTPUT
+        
+    - name: Check submissions
+      if: steps.calculate.outputs.out_of_range == 'false'
+      id: check
+      run: |
+        FOLDER_PATH="${{ steps.problem.outputs.folder_path }}"
+        
+        # 스터디원 목록
+        declare -a members=("황인찬" "유도현" "배은경" "남연우")
+        
+        SUBMITTED=()
+        MISSING=()
+        
+        echo "📂 오늘의 폴더: $FOLDER_PATH"
+        
+        # 폴더가 존재하는지 확인
+        if [ ! -d "$FOLDER_PATH" ]; then
+          echo "❌ 오늘의 폴더가 없습니다: $FOLDER_PATH"
+          echo "all_missing=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # 각 스터디원의 제출 파일 확인
+        for member in "${members[@]}"; do
+          # 가능한 확장자들 체크 (.java, .py, .cpp, .js 등)
+          found=false
+          for ext in "java" "py" "cpp" "js" "kt" "go" "swift"; do
+            if [ -f "$FOLDER_PATH/${member}.${ext}" ]; then
+              SUBMITTED+=("$member")
+              found=true
+              break
+            fi
+          done
+          
+          if [ "$found" = false ]; then
+            MISSING+=("$member")
+          fi
+        done
+        
+        # 결과 정리
+        SUBMITTED_COUNT=${#SUBMITTED[@]}
+        MISSING_COUNT=${#MISSING[@]}
+        TOTAL_MEMBERS=${#members[@]}
+        
+        echo "submitted_count=$SUBMITTED_COUNT" >> $GITHUB_OUTPUT
+        echo "missing_count=$MISSING_COUNT" >> $GITHUB_OUTPUT
+        echo "total_members=$TOTAL_MEMBERS" >> $GITHUB_OUTPUT
+        echo "all_missing=false" >> $GITHUB_OUTPUT
+        
+        # 결과를 쉼표로 구분된 문자열로 변환
+        IFS=',' 
+        SUBMITTED_LIST="${SUBMITTED[*]}"
+        MISSING_LIST="${MISSING[*]}"
+        IFS=' '
+        
+        echo "submitted_list=$SUBMITTED_LIST" >> $GITHUB_OUTPUT
+        echo "missing_list=$MISSING_LIST" >> $GITHUB_OUTPUT
+        
+        # 로그 출력
+        echo "✅ 제출 완료 ($SUBMITTED_COUNT/$TOTAL_MEMBERS): $SUBMITTED_LIST"
+        echo "❌ 미제출 ($MISSING_COUNT/$TOTAL_MEMBERS): $MISSING_LIST"
+        
+    - name: Send submission status to Discord
+      if: steps.calculate.outputs.out_of_range == 'false'
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: |
+        DAY_NUMBER=${{ steps.calculate.outputs.day_number }}
+        PROBLEM_NAME="${{ steps.problem.outputs.problem_name }}"
+        SUBMITTED_COUNT=${{ steps.check.outputs.submitted_count }}
+        MISSING_COUNT=${{ steps.check.outputs.missing_count }}
+        TOTAL_MEMBERS=${{ steps.check.outputs.total_members }}
+        SUBMITTED_LIST="${{ steps.check.outputs.submitted_list }}"
+        MISSING_LIST="${{ steps.check.outputs.missing_list }}"
+        
+        # 색상 결정 (모두 제출: 초록, 일부 미제출: 노랑, 모두 미제출: 빨강)
+        if [ $MISSING_COUNT -eq 0 ]; then
+          COLOR=65280  # 초록
+          TITLE="🎉 Day $DAY_NUMBER 제출 완료!"
+        elif [ $MISSING_COUNT -eq $TOTAL_MEMBERS ]; then
+          COLOR=16711680  # 빨강
+          TITLE="😱 Day $DAY_NUMBER 아무도 제출 안함!"
+        else
+          COLOR=16776960  # 노랑
+          TITLE="⚠️ Day $DAY_NUMBER 제출 현황"
+        fi
+        
+        # Discord 메시지 생성
+        DISCORD_MESSAGE=$(cat << EOF
+        {
+          "embeds": [{
+            "title": "$TITLE",
+            "description": "**Day $DAY_NUMBER** - $PROBLEM_NAME 제출 현황 (23:30 기준)",
+            "color": $COLOR,
+            "fields": [
+              {
+                "name": "📊 제출 현황",
+                "value": "$SUBMITTED_COUNT/$TOTAL_MEMBERS 명 제출",
+                "inline": true
+              },
+              {
+                "name": "📅 날짜",
+                "value": "${{ steps.calculate.outputs.current_date }}",
+                "inline": true
+              },
+              {
+                "name": "⏰ 체크 시간",
+                "value": "23:30",
+                "inline": true
+              }
+        EOF
+        )
+        
+        # 제출 완료자 목록 추가 (있는 경우)
+        if [ ! -z "$SUBMITTED_LIST" ]; then
+          DISCORD_MESSAGE+=",{\"name\": \"✅ 제출 완료\",\"value\": \"$SUBMITTED_LIST\",\"inline\": false}"
+        fi
+        
+        # 미제출자 목록 추가 (있는 경우)
+        if [ ! -z "$MISSING_LIST" ]; then
+          DISCORD_MESSAGE+=",{\"name\": \"❌ 미제출 (메가커피 타임!)\",\"value\": \"$MISSING_LIST\",\"inline\": false}"
+        fi
+        
+        # 메시지 마무리
+        DISCORD_MESSAGE+=$(cat << EOF
+            ],
+            "footer": {
+              "text": "제출은 내일 오전 9시 전까지 가능합니다"
+            },
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+          }]
+        }
+        EOF
+        )
+        
+        # Discord로 전송
+        curl -X POST "$DISCORD_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "$DISCORD_MESSAGE"
+          
+    - name: Log final result
+      if: steps.calculate.outputs.out_of_range == 'false'
+      run: |
+        echo "📊 최종 결과:"
+        echo "제출: ${{ steps.check.outputs.submitted_count }}/${{ steps.check.outputs.total_members }}"
+        echo "완료자: ${{ steps.check.outputs.submitted_list }}"
+        echo "미제출: ${{ steps.check.outputs.missing_list }}"
