@@ -250,15 +250,12 @@ jobs:
         
         # 미제출자 목록 추가 (있는 경우)
         if [ ! -z "$MISSING_LIST" ]; then
-          DISCORD_MESSAGE+=",{\"name\": \"❌ 미제출 (메가커피 타임!)\",\"value\": \"$MISSING_LIST\",\"inline\": false}"
+          DISCORD_MESSAGE+=",{\"name\": \"❌ 미제출 (메가커피 쿠폰쏘기!)\",\"value\": \"$MISSING_LIST\",\"inline\": false}"
         fi
         
         # 메시지 마무리
         DISCORD_MESSAGE+=$(cat << EOF
             ],
-            "footer": {
-              "text": "지각!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            },
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
           }]
         }
