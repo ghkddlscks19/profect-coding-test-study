@@ -33,7 +33,7 @@
 1. **레포지토리 클론**:
     
     ```bash
-    git clone https://github.com/<소유자>/coding-test-study.git
+    https://github.com/ghkddlscks19/profect-coding-test-study.git
     cd coding-test-study
     ```
     
