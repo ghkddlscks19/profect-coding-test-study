@@ -34,7 +34,7 @@
     
     ```bash
     git clone https://github.com/ghkddlscks19/profect-coding-test-study.git
-    cd coding-test-study
+    cd profect-coding-test-study
     ```
     
 2. **최신 상태 동기화**:
