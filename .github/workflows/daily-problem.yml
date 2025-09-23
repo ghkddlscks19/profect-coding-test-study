@@ -153,7 +153,7 @@ jobs:
         echo "chapter=$CHAPTER" >> $GITHUB_OUTPUT
         
         # 폴더명을 위한 문제 이름 (특수문자 제거)
-        CLEAN_NAME=$(echo "$NAME" | sed 's/[^a-zA-Z0-9가-힣]//g')
+        CLEAN_NAME=$(echo "$NAME" | tr -d ' .-')
         echo "clean_name=$CLEAN_NAME" >> $GITHUB_OUTPUT
         
     - name: Create problem folder
