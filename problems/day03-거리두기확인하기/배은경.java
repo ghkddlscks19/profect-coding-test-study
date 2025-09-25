@@ -35,7 +35,7 @@ class Solution {
     public int[] solution(String[][] places) {
         int leng = places[0].length;
         
-        //p이면 자신의 아래(2칸까지), 오른쪽(2칸까지), 대각선(/,\)에 p없는지, 있더라도 그 사이에 파티션이 있는지 CHECK
+        //p이면 자신의 아래(2칸까지), 오른쪽(2칸까지), 대각선(/,\)에 P 없는지, 있더라도 그 사이에 파티션이 있는지 CHECK
         int[] answer = new int[leng];
         for(int i = 0; i < leng; i++) {
             String[] s = places[i];
