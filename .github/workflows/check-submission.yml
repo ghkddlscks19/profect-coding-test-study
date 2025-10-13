@@ -138,7 +138,7 @@ jobs:
         FOLDER_PATH="${{ steps.problem.outputs.folder_path }}"
         
         # 스터디원 목록
-        declare -a members=("황인찬" "유도현" "배은경" "남연우")
+        declare -a members=("황인찬" "유도현" "배은경" "남연우" "윤호상")
         
         SUBMITTED=()
         MISSING=()
