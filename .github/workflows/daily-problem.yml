@@ -4,7 +4,8 @@ name: Daily Programmers Problem to Discord
 on:
   schedule:
     # 매일 오전 9시 (UTC 기준 0시 = 한국시간 9시)
-    - cron: '0 0 * * *'
+    # 매번 1시간 30분씩 늦게 와서 UTC 기준 22:30 = 한국 시간 07:30
+    - cron: '30 22 * * *'
   workflow_dispatch: # 수동 실행도 가능
 
 jobs:
