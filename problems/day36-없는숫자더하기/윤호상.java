@@ -7,7 +7,6 @@ class Solution {
             sum+=numbers[i];
         }
         answer = 45-sum;
-        
         return answer;
     }
 }
