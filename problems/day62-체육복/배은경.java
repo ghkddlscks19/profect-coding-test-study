@@ -20,7 +20,7 @@ class Solution {
         for(int i = 0; i < list.size(); i++) {
             int[] p = {-1, 1};
             int idx = 0;
-            while(idx<= 1){
+            while(idx<= 1) {
                 int target = list.get(i) + p[idx];
                 if(set.contains(target)){
                     answer++;
