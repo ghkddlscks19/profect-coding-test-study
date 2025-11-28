@@ -36,6 +36,3 @@ def solution(n, k):
         answer += check(temp)
     return answer
 
-n = 437674
-k = 3
-print(solution(n,k))
