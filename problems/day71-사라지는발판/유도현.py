@@ -29,7 +29,7 @@ def solution(board, aloc, bloc):
                     else:
                         lose_cnt = max(lose_cnt, opp_cnt)
 
-            visited[x][y] = 1   # 🔁 상태 복원
+            visited[x][y] = 1   
 
             if not can_move:
                 return (False, count)
@@ -60,7 +60,7 @@ def solution(board, aloc, bloc):
                     else:
                         lose_cnt = max(lose_cnt, opp_cnt)
 
-            visited[x][y] = 1   # 🔁 복원
+            visited[x][y] = 1  
 
             if not can_move:
                 return (False, count)
@@ -93,7 +93,7 @@ def solution(board, aloc, bloc):
 #                         return # return을 바로 해도 되나?
 #                     else: # 만약 둘이 같은 발판에 없어. 그러면 a가 움직여야지
 #                         dfs((turn + 1) % 2, visited, count + 1, [nr,nc], bloc)
-#             # 여기서 밢판이 없어서 여기로 왔어. 근데 여기서 풀어버리면 
+#             #visited[ar][ac] = 0
 
 #         if turn == 1:
 #             br, bc = bloc[0], bloc[1]
@@ -107,6 +107,7 @@ def solution(board, aloc, bloc):
 #                         return
 #                     else:
 #                         dfs((turn + 1) % 2, visited, count + 1, aloc, [nr,nc])
+#             visited[br][bc] = 0 
                     
 
 #     lenR, lenC = len(board), len(board[0])
@@ -115,27 +116,3 @@ def solution(board, aloc, bloc):
 
 
 #     return answer
-
-#dfs의 핵심은 돌아갈 때는 다시 돌려놔야 한다는 것이야
-
-# 저렇게 반복을 돌리면 현재 반복에서는 상대방 발판이 있는 곳에 가는게 최선이지만 그걸 모르고 가기 싫다고 안 가면
-# 다음 반복들에서는 만약 갈 수 있는 발판이 없다면 난 1턴을 더 버틸 수 있는데 못 버티는 상황이 됨
-# 그러니 가는게 맞음, 그래서 경우의 수를 세는거임.
-
-
-
-
-
-
-# - 문제 정리
-# 양 플레이어가 캐릭터를 몇 번 움직일지
-# 상하좌우 중 하나로 옮겨야 하고 옮기는 순간 원래 발판은 사라짐
-# 움직일 수 없으면, 같은 발판에 있다가 상대가 먼저 나가면 패배
-# 즉 2번 째 조건은 내가 서 있는 발판(남이 서 있는 발판에 내가 들어가면)에 누가 들어오면
-# 그 때 이제 다음 차례에 움직일 수 있는 발판이 생기면 내가 이기게 되는거네
-# 게임은 항상 플레이어 A가 먼저 시작
-# 시작 지점이 같을 수 있다는 것은 A가 움직일 수 있으면 1, 없으면 0 Return
-
-# 풀이 방법 정리
-# 모든 경우의 수 중에서 최솟 값을 구하면 돼, 이기려는 사람은 가장 빨리 끝내려고 할 테니깐
-# 격자판의 크기까지 작으니깐 이제 이것은 dfs?
