@@ -1,0 +1,324 @@
+# .github/workflows/daily-problem-baekjoon-random.yml
+name: Daily Random Baekjoon Problem
+
+on:
+  schedule:
+    # 매일 오전 9시 (UTC 기준 0시 = 한국시간 9시)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 수동 실행도 가능
+
+jobs:
+  send-daily-problem:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action Bot"
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+        
+    - name: Install dependencies
+      run: |
+        pip install requests
+        
+    - name: Calculate day number
+      id: calculate
+      run: |
+        START_DATE="2025-12-11"
+        TODAY=$(date +%Y-%m-%d)
+        
+        DAYS_DIFF=$(( ( $(date -d "$TODAY" +%s) - $(date -d "$START_DATE" +%s) ) / 86400 ))
+        # 프로그래머스가 Day 1-79였으므로 백준은 Day 80부터 시작
+        DAY_NUMBER=$(( $DAYS_DIFF + 80 ))
+        
+        echo "day_number=$DAY_NUMBER" >> $GITHUB_OUTPUT
+        echo "current_date=$TODAY" >> $GITHUB_OUTPUT
+        
+        if [ $DAY_NUMBER -lt 80 ]; then
+          echo "not_started=true" >> $GITHUB_OUTPUT
+        else
+          echo "not_started=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Get random problem from solved.ac
+      if: steps.calculate.outputs.not_started == 'false'
+      id: problem
+      run: |
+        python << 'PYTHON_SCRIPT'
+        import requests
+        import random
+        import os
+        import time
+        import glob
+        import re
+        
+        def get_tier_name(tier_level):
+            tiers = {
+                8: "Silver III", 9: "Silver II", 10: "Silver I",
+                11: "Gold V", 12: "Gold IV", 13: "Gold III", 14: "Gold II"
+            }
+            return tiers.get(tier_level, "Unknown")
+        
+        def get_solved_problems():
+            """이미 풀었던 문제 번호 목록 가져오기"""
+            solved = set()
+            
+            # problems/ 폴더에서 모든 폴더 찾기
+            if os.path.exists('problems'):
+                folders = glob.glob('problems/day*')
+                for folder in folders:
+                    # 폴더명에서 문제 번호 추출
+                    # 형식: day0080-1753-최단경로
+                    match = re.search(r'day\d+-(\d+)-', folder)
+                    if match:
+                        problem_num = match.group(1)
+                        solved.add(problem_num)
+            
+            print(f"📚 이미 풀은 문제 수: {len(solved)}개")
+            if solved and len(solved) <= 10:
+                print(f"   문제 번호: {sorted(solved)}")
+            
+            return solved
+        
+        def get_random_problem():
+            # 이미 풀은 문제 목록
+            solved_problems = get_solved_problems()
+            
+            max_attempts = 50  # 최대 50번 시도
+            
+            for attempt in range(max_attempts):
+                # Silver 3 ~ Gold 2 범위에서 랜덤 난이도 선택
+                tier = random.randint(8, 14)
+                
+                # solved.ac API 호출 (랜덤 페이지)
+                random_page = random.randint(1, 20)
+                
+                url = "https://solved.ac/api/v3/search/problem"
+                params = {
+                    "query": f"tier:{tier} solved:1000..",  # 1000명 이상 푼 문제
+                    "page": random_page,
+                    "sort": "random",  # 랜덤 정렬
+                    "direction": "desc"
+                }
+                
+                try:
+                    response = requests.get(url, params=params, timeout=10)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        items = data.get("items", [])
+                        
+                        if items:
+                            # 페이지 내에서 랜덤 선택
+                            random.shuffle(items)  # 순서 섞기
+                            
+                            for problem in items:
+                                problem_id = str(problem.get("problemId"))
+                                
+                                # 중복 체크
+                                if problem_id not in solved_problems:
+                                    title = problem.get("titleKo")
+                                    level = problem.get("level")
+                                    tags = problem.get("tags", [])
+                                    
+                                    # 알고리즘 분류 추출
+                                    tag_names = []
+                                    for tag in tags[:2]:
+                                        tag_name = tag.get("displayNames", [{}])[0].get("name", "")
+                                        if tag_name:
+                                            tag_names.append(tag_name)
+                                    
+                                    category = ", ".join(tag_names) if tag_names else "구현"
+                                    tier_name = get_tier_name(level)
+                                    
+                                    # GitHub Actions output 설정
+                                    with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                                        f.write(f"number={problem_id}\n")
+                                        f.write(f"name={title}\n")
+                                        f.write(f"tier={tier_name}\n")
+                                        f.write(f"category={category}\n")
+                                        # 폴더명용 clean name
+                                        clean_name = ''.join(c for c in title if c.isalnum() or c in ' ')
+                                        clean_name = clean_name.replace(' ', '')
+                                        f.write(f"clean_name={clean_name}\n")
+                                    
+                                    print(f"✅ 새로운 문제 선택 완료: [{problem_id}] {title}")
+                                    print(f"   난이도: {tier_name}, 분류: {category}")
+                                    print(f"   시도 횟수: {attempt + 1}/{max_attempts}")
+                                    return True
+                            
+                            # 해당 페이지의 모든 문제가 중복
+                            print(f"⚠️  페이지 {random_page}의 모든 문제가 중복 (시도 {attempt + 1}/{max_attempts})")
+                    
+                except Exception as e:
+                    print(f"❌ API 호출 실패 (시도 {attempt + 1}): {e}")
+                
+                time.sleep(0.3)  # API 제한 방지
+            
+            print(f"❌ {max_attempts}번 시도했지만 중복되지 않는 문제를 찾지 못했습니다.")
+            return False
+        
+        # 최대 5번 재시도
+        for main_attempt in range(5):
+            if get_random_problem():
+                break
+            print(f"재시도 {main_attempt + 1}/5...")
+            time.sleep(1)
+        else:
+            # 실패 시 기본 문제 사용
+            print("⚠️ API 호출 실패, 기본 문제 사용")
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                f.write("number=1000\n")
+                f.write("name=A+B\n")
+                f.write("tier=Bronze V\n")
+                f.write("category=수학\n")
+                f.write("clean_name=AB\n")
+        
+        PYTHON_SCRIPT
+        
+    - name: Create problem folder
+      if: steps.calculate.outputs.not_started == 'false'
+      id: folder
+      run: |
+        DAY_NUM=${{ steps.calculate.outputs.day_number }}
+        PROBLEM_NUM="${{ steps.problem.outputs.number }}"
+        PROBLEM_NAME="${{ steps.problem.outputs.clean_name }}"
+        
+        FOLDER_NAME="day$(printf "%04d" $DAY_NUM)-${PROBLEM_NUM}-${PROBLEM_NAME}"
+        FOLDER_PATH="problems/${FOLDER_NAME}"
+        
+        if [ -d "$FOLDER_PATH" ]; then
+          echo "📁 폴더가 이미 존재합니다: $FOLDER_PATH"
+          echo "folder_created=false" >> $GITHUB_OUTPUT
+        else
+          mkdir -p "$FOLDER_PATH"
+          
+          # .gitkeep 파일 생성 (빈 폴더도 커밋되도록)
+          touch "$FOLDER_PATH/.gitkeep"
+          
+          echo "📁 새 폴더 생성: $FOLDER_PATH"
+          echo "folder_created=true" >> $GITHUB_OUTPUT
+          echo "folder_path=$FOLDER_PATH" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Commit and push folder
+      if: steps.calculate.outputs.not_started == 'false'
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          git add .
+          git commit -m "🗂️ Day ${{ steps.calculate.outputs.day_number }}: [${{ steps.problem.outputs.number }}] ${{ steps.problem.outputs.name }}"
+          git push origin main
+          echo "✅ 새 폴더를 커밋하고 푸시했습니다!"
+        else
+          echo "📂 커밋할 변경사항이 없습니다."
+        fi
+        
+    - name: Send daily problem to Discord
+      if: steps.calculate.outputs.not_started == 'false'
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: |
+        DISCORD_MESSAGE=$(cat << EOF
+        {
+          "embeds": [{
+            "title": "🎲 오늘의 랜덤 백준 문제 [${{ steps.problem.outputs.tier }}]",
+            "description": "**Day ${{ steps.calculate.outputs.day_number }}** (백준 Day $(( ${{ steps.calculate.outputs.day_number }} - 79 ))) - [${{ steps.problem.outputs.number }}] ${{ steps.problem.outputs.name }}",
+            "color": 15844367,
+            "fields": [
+              {
+                "name": "🏆 난이도",
+                "value": "${{ steps.problem.outputs.tier }}",
+                "inline": true
+              },
+              {
+                "name": "📅 날짜",
+                "value": "${{ steps.calculate.outputs.current_date }}",
+                "inline": true
+              },
+              {
+                "name": "🔗 문제 링크",
+                "value": "[백준 ${{ steps.problem.outputs.number }}번](https://www.acmicpc.net/problem/${{ steps.problem.outputs.number }})",
+                "inline": false
+              },
+              {
+                "name": "📂 폴더 경로",
+                "value": "\`problems/day$(printf "%04d" ${{ steps.calculate.outputs.day_number }})-${{ steps.problem.outputs.number }}-${{ steps.problem.outputs.clean_name }}/\`",
+                "inline": false
+              }
+            ],
+            "footer": {
+              "text": "💪 매일 새로운 문제로 실력 UP! 🚀"
+            },
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+          }]
+        }
+        EOF
+        )
+        
+        curl -X POST "$DISCORD_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "$DISCORD_MESSAGE"
+          
+    - name: Send not started message
+      if: steps.calculate.outputs.not_started == 'true'
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: |
+        NOT_STARTED_MESSAGE=$(cat << EOF
+        {
+          "embeds": [{
+            "title": "⏰ 아직 시작 전입니다",
+            "description": "백준 랜덤 문제는 프로그래머스 79일을 완료한 후 시작됩니다.",
+            "color": 16776960,
+            "fields": [
+              {
+                "name": "📅 시작 예정일",
+                "value": "2025-12-11 (Day 80부터)",
+                "inline": true
+              },
+              {
+                "name": "📅 오늘 날짜",
+                "value": "${{ steps.calculate.outputs.current_date }}",
+                "inline": true
+              },
+              {
+                "name": "📚 현재 진행",
+                "value": "프로그래머스 Day ${{ steps.calculate.outputs.day_number }}/79",
+                "inline": true
+              }
+            ],
+            "footer": {
+              "text": "프로그래머스 완료 후 백준 시작! ⏳"
+            },
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+          }]
+        }
+        EOF
+        )
+        
+        curl -X POST "$DISCORD_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "$NOT_STARTED_MESSAGE"
+          
+    - name: Log success
+      run: |
+        if [ "${{ steps.calculate.outputs.not_started }}" == "true" ]; then
+          echo "⏰ 아직 시작 전입니다."
+        else
+          echo "✅ 성공적으로 전송되었습니다!"
+          echo "📅 날짜: ${{ steps.calculate.outputs.current_date }}"
+          echo "📚 문제: [${{ steps.problem.outputs.number }}] ${{ steps.problem.outputs.name }}"
+          echo "🔢 Day: ${{ steps.calculate.outputs.day_number }}"
+          echo "🎲 난이도: ${{ steps.problem.outputs.tier }}"
+          echo "📂 알고리즘: ${{ steps.problem.outputs.category }}"
+        fi
