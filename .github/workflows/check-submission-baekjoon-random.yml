@@ -1,0 +1,191 @@
+# .github/workflows/check-submission-baekjoon-random.yml
+name: Check Daily Random Baekjoon Submissions
+
+on:
+  schedule:
+    # 매일 오후 11시 30분 (UTC 기준 14:30 = 한국시간 23:30)
+    - cron: '30 14 * * *'
+  workflow_dispatch: # 수동 실행도 가능
+
+jobs:
+  check-submissions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Calculate today's day number
+      id: calculate
+      run: |
+        START_DATE="2025-12-11"
+        TODAY=$(date +%Y-%m-%d)
+        
+        DAYS_DIFF=$(( ( $(date -d "$TODAY" +%s) - $(date -d "$START_DATE" +%s) ) / 86400 ))
+        # 프로그래머스가 Day 1-79였으므로 백준은 Day 80부터 시작
+        DAY_NUMBER=$(( $DAYS_DIFF + 80 ))
+        
+        echo "day_number=$DAY_NUMBER" >> $GITHUB_OUTPUT
+        echo "current_date=$TODAY" >> $GITHUB_OUTPUT
+        
+        if [ $DAY_NUMBER -lt 80 ]; then
+          echo "out_of_range=true" >> $GITHUB_OUTPUT
+        else
+          echo "out_of_range=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Find today's problem folder
+      if: steps.calculate.outputs.out_of_range == 'false'
+      id: find_folder
+      run: |
+        DAY_NUMBER=${{ steps.calculate.outputs.day_number }}
+        DAY_PREFIX="day$(printf "%04d" $DAY_NUMBER)"
+        
+        # problems/ 디렉토리에서 오늘 날짜로 시작하는 폴더 찾기
+        FOLDER_PATH=$(find problems -maxdepth 1 -type d -name "${DAY_PREFIX}-*" | head -n 1)
+        
+        if [ -z "$FOLDER_PATH" ]; then
+          echo "❌ 오늘의 폴더를 찾을 수 없습니다"
+          echo "folder_found=false" >> $GITHUB_OUTPUT
+        else
+          echo "📂 오늘의 폴더: $FOLDER_PATH"
+          echo "folder_found=true" >> $GITHUB_OUTPUT
+          echo "folder_path=$FOLDER_PATH" >> $GITHUB_OUTPUT
+          
+          # 폴더명에서 문제 번호와 이름 추출
+          # 형식: day0001-1000-AB
+          FOLDER_NAME=$(basename "$FOLDER_PATH")
+          PROBLEM_NUMBER=$(echo "$FOLDER_NAME" | cut -d'-' -f2)
+          PROBLEM_NAME=$(echo "$FOLDER_NAME" | cut -d'-' -f3-)
+          
+          echo "problem_number=$PROBLEM_NUMBER" >> $GITHUB_OUTPUT
+          echo "problem_name=$PROBLEM_NAME" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Check submissions
+      if: steps.calculate.outputs.out_of_range == 'false' && steps.find_folder.outputs.folder_found == 'true'
+      id: check
+      run: |
+        FOLDER_PATH="${{ steps.find_folder.outputs.folder_path }}"
+        
+        declare -a members=("황인찬" "유도현" "배은경" "남연우" "윤호상" "김현경")
+        
+        SUBMITTED=()
+        MISSING=()
+        
+        for member in "${members[@]}"; do
+          found=false
+          for ext in "java" "py" "cpp" "js" "kt" "go" "swift" "c" "cs"; do
+            if [ -f "$FOLDER_PATH/${member}.${ext}" ]; then
+              SUBMITTED+=("$member")
+              found=true
+              break
+            fi
+          done
+          
+          if [ "$found" = false ]; then
+            MISSING+=("$member")
+          fi
+        done
+        
+        SUBMITTED_COUNT=${#SUBMITTED[@]}
+        MISSING_COUNT=${#MISSING[@]}
+        TOTAL_MEMBERS=${#members[@]}
+        
+        echo "submitted_count=$SUBMITTED_COUNT" >> $GITHUB_OUTPUT
+        echo "missing_count=$MISSING_COUNT" >> $GITHUB_OUTPUT
+        echo "total_members=$TOTAL_MEMBERS" >> $GITHUB_OUTPUT
+        
+        IFS=',' 
+        SUBMITTED_LIST="${SUBMITTED[*]}"
+        MISSING_LIST="${MISSING[*]}"
+        IFS=' '
+        
+        echo "submitted_list=$SUBMITTED_LIST" >> $GITHUB_OUTPUT
+        echo "missing_list=$MISSING_LIST" >> $GITHUB_OUTPUT
+        
+        echo "✅ 제출 완료 ($SUBMITTED_COUNT/$TOTAL_MEMBERS): $SUBMITTED_LIST"
+        echo "❌ 미제출 ($MISSING_COUNT/$TOTAL_MEMBERS): $MISSING_LIST"
+        
+    - name: Send submission status to Discord
+      if: steps.calculate.outputs.out_of_range == 'false' && steps.find_folder.outputs.folder_found == 'true'
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: |
+        DAY_NUMBER=${{ steps.calculate.outputs.day_number }}
+        BAEKJOON_DAY=$(( $DAY_NUMBER - 79 ))
+        PROBLEM_NUMBER="${{ steps.find_folder.outputs.problem_number }}"
+        PROBLEM_NAME="${{ steps.find_folder.outputs.problem_name }}"
+        SUBMITTED_COUNT=${{ steps.check.outputs.submitted_count }}
+        MISSING_COUNT=${{ steps.check.outputs.missing_count }}
+        TOTAL_MEMBERS=${{ steps.check.outputs.total_members }}
+        SUBMITTED_LIST="${{ steps.check.outputs.submitted_list }}"
+        MISSING_LIST="${{ steps.check.outputs.missing_list }}"
+        
+        if [ $MISSING_COUNT -eq 0 ]; then
+          COLOR=65280
+          TITLE="🎉 Day $DAY_NUMBER 제출 완료!"
+        elif [ $MISSING_COUNT -eq $TOTAL_MEMBERS ]; then
+          COLOR=16711680
+          TITLE="😱 Day $DAY_NUMBER 아무도 제출 안함!"
+        else
+          COLOR=16776960
+          TITLE="⚠️ Day $DAY_NUMBER 제출 현황"
+        fi
+        
+        DISCORD_MESSAGE=$(cat << EOF
+        {
+          "embeds": [{
+            "title": "$TITLE",
+            "description": "**Day $DAY_NUMBER** (백준 Day $BAEKJOON_DAY) - [$PROBLEM_NUMBER] $PROBLEM_NAME 제출 현황 (23:30 기준)",
+            "color": $COLOR,
+            "fields": [
+              {
+                "name": "📊 제출 현황",
+                "value": "$SUBMITTED_COUNT/$TOTAL_MEMBERS 명 제출",
+                "inline": true
+              },
+              {
+                "name": "📅 날짜",
+                "value": "${{ steps.calculate.outputs.current_date }}",
+                "inline": true
+              },
+              {
+                "name": "⏰ 체크 시간",
+                "value": "23:30",
+                "inline": true
+              }
+        EOF
+        )
+        
+        if [ ! -z "$SUBMITTED_LIST" ]; then
+          DISCORD_MESSAGE+=",{\"name\": \"✅ 제출 완료\",\"value\": \"$SUBMITTED_LIST\",\"inline\": false}"
+        fi
+        
+        if [ ! -z "$MISSING_LIST" ]; then
+          DISCORD_MESSAGE+=",{\"name\": \"❌ 미제출 (메가커피 쿠폰쏘기!)\",\"value\": \"$MISSING_LIST\",\"inline\": false}"
+        fi
+        
+        DISCORD_MESSAGE+=$(cat << EOF
+            ],
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+          }]
+        }
+        EOF
+        )
+        
+        curl -X POST "$DISCORD_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "$DISCORD_MESSAGE"
+          
+    - name: Log final result
+      if: steps.calculate.outputs.out_of_range == 'false'
+      run: |
+        if [ "${{ steps.find_folder.outputs.folder_found }}" == "true" ]; then
+          echo "📊 최종 결과:"
+          echo "제출: ${{ steps.check.outputs.submitted_count }}/${{ steps.check.outputs.total_members }}"
+          echo "완료자: ${{ steps.check.outputs.submitted_list }}"
+          echo "미제출: ${{ steps.check.outputs.missing_list }}"
+        else
+          echo "📂 오늘의 폴더를 찾을 수 없습니다"
+        fi
