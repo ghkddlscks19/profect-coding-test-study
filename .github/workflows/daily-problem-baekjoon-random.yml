@@ -34,7 +34,7 @@ jobs:
     - name: Calculate day number
       id: calculate
       run: |
-        START_DATE="2025-12-10"
+        START_DATE="2025-12-11"
         TODAY=$(date +%Y-%m-%d)
         
         DAYS_DIFF=$(( ( $(date -d "$TODAY" +%s) - $(date -d "$START_DATE" +%s) ) / 86400 ))
