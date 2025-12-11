@@ -39,7 +39,7 @@ jobs:
       id: find_folder
       run: |
         DAY_NUMBER=${{ steps.calculate.outputs.day_number }}
-        DAY_PREFIX="day$(printf "%04d" $DAY_NUMBER)"
+        DAY_PREFIX="day${DAY_NUMBER}"
         
         # problems/ 디렉토리에서 오늘 날짜로 시작하는 폴더 찾기
         FOLDER_PATH=$(find problems -maxdepth 1 -type d -name "${DAY_PREFIX}-*" | head -n 1)
