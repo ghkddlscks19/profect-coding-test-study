@@ -194,7 +194,7 @@ jobs:
         PROBLEM_NUM="${{ steps.problem.outputs.number }}"
         PROBLEM_NAME="${{ steps.problem.outputs.clean_name }}"
         
-        FOLDER_NAME="day$(printf "%04d" $DAY_NUM)-${PROBLEM_NUM}-${PROBLEM_NAME}"
+        FOLDER_NAME="day${DAY_NUM}-${PROBLEM_NUM}-${PROBLEM_NAME}"
         FOLDER_PATH="problems/${FOLDER_NAME}"
         
         if [ -d "$FOLDER_PATH" ]; then
@@ -252,7 +252,7 @@ jobs:
               },
               {
                 "name": "📂 폴더 경로",
-                "value": "\`problems/day$(printf "%04d" ${{ steps.calculate.outputs.day_number }})-${{ steps.problem.outputs.number }}-${{ steps.problem.outputs.clean_name }}/\`",
+                "value": "\`problems/day${{ steps.calculate.outputs.day_number }}-${{ steps.problem.outputs.number }}-${{ steps.problem.outputs.clean_name }}/\`",
                 "inline": false
               }
             ],
