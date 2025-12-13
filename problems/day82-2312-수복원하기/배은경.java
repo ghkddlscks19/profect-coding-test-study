@@ -4,9 +4,9 @@ import java.io.*;
 class Main {
     public static void main(String[] args) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-        int tc = Integer.parseInt(br.readLine());
+        int t = Integer.parseInt(br.readLine());
         
-        for(int i = 0; i < tc; i++) {
+        for(int i = 0; i < t; i++) {
             int num = Integer.parseInt(br.readLine());
             int n = 2;
             int cnt = 0;
