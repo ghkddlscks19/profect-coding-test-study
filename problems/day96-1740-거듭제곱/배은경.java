@@ -9,9 +9,8 @@ class Main {
         long sqr = 1;
         
         while(n > 0) {
-            if(n % 2 == 1) {
+            if(n % 2 == 1)
                 rslt += sqr;
-            }
             sqr *= 3;
             n /= 2;
         }
