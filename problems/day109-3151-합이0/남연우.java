@@ -14,7 +14,7 @@ public class Main{
     }
     Arrays.sort(A);
 
-    int count = 0;
+    long count = 0;
     for (int i = 0; i < N; i++) {
       int left = i + 1;
       int right = N - 1;
@@ -24,7 +24,7 @@ public class Main{
         if (sum == 0) {
           if (A[left] == A[right]) {
             int cnt = right - left + 1;
-            count += cnt * (cnt - 1) / 2;
+            count += (long) cnt * (cnt - 1) / 2;
             break;
           }
 
@@ -42,7 +42,7 @@ public class Main{
             right--;
           }
 
-          count += lCnt * rCnt;
+          count += (long) lCnt * rCnt;
         }
           
         else if (sum > 0)
