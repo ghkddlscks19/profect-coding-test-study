@@ -1,0 +1,25 @@
+import java.io.*;
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        int n = Integer.parseInt(br.readLine());
+        long[] arr = new long[n];
+        
+        StringTokenizer st = new StringTokenizer(br.readLine());
+        for(int i = 0; i < n; i++)
+            arr[i] = Long.parseLong(st.nextToken());
+        Arrays.sort(arr);
+        
+        long max = arr[n - 1];
+        if(n % 2 == 1)
+            for(int i = 0; i < n /2; i++)
+                max = Math.max(arr[i] + arr[n - i - 2], max);
+        else
+            for(int i = 0; i < n /2; i++)
+                max = Math.max(arr[i] + arr[n - i - 1], max);
+        
+        System.out.print(max);
+    }
+}
